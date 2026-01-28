@@ -6,9 +6,9 @@ import os
 env = gym.make("CartPole-v1", render_mode="human")
 
 # 2. 实例化 PPO 算法
-# 建议：由于你有 RTX 3060，device="cuda" 会自动加速
-model = PPO("MlpPolicy", env, verbose=1, device="cuda")
-
+# 修改第 11 行左右
+# 加入 tensorboard_log="./logs/" 这样系统会自动生成日志文件 [cite: 12]
+model = PPO("MlpPolicy", env, verbose=1, device="cuda", tensorboard_log="./logs/")
 # 3. 开始训练
 print("🚀 开始平衡训练...")
 model.learn(total_timesteps=10000)
