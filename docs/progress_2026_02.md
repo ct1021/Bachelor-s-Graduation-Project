@@ -25,45 +25,70 @@
 - 模型参数量仅 **12,236** 个，满足"小模型"定位
 - 提供 `get_distribution(obs)` 接口返回 `torch.distributions.Normal`，直接支撑 KL 散度计算
 
+**图1：GaitPriorNetwork 网络架构**
+
+![GaitPriorNetwork 网络架构图](figures/fig1_architecture.png)
+
 #### (2) 混合损失函数（`scripts/hybrid_loss.py`）
 - 实现导师要求的损失机制：**Loss = BC_Loss + λ × KL_Divergence**
 - BC_Loss：MSE 回归损失，衡量预测动作与专家动作的偏差
 - KL_Divergence：通过 `torch.distributions.kl_divergence` **精确闭式计算**两个高斯分布之间的 KL 散度，约束实时策略分布不偏离先验分布
 - λ 权重可配置（默认 0.1），支持在"保守跟随先验"与"自由探索"之间灵活调节
-- 验证结果：BC Loss = 0.4607, KL Loss = 2.141, Total Loss = 0.6748，梯度回传正常
+
+**图2：混合损失训练收敛曲线（80 epochs）**
+
+![混合损失训练收敛曲线](figures/fig2_training_curves.png)
+
+由上图可见：
+- **Total Loss**（蓝色实线）从 0.50 稳步下降至 0.10，训练收敛良好
+- **BC Loss**（绿色虚线）迅速降至 0.05 以下，策略成功学会模仿专家动作
+- **KL Divergence**（右图红色）从 3.0 收敛至 0.6，在线策略逐步靠近先验分布
 
 #### (3) 物理感知奖励函数（`scripts/physics_reward.py`）
 - 设计了 Stable-Baselines3 兼容的 `PhysicsRewardWrapper` 自定义奖励包装器
-- 三大物理约束奖励分量：
+- 包含三大物理约束奖励分量：速度跟踪、能耗惩罚(COT)、CoP稳定性约束
 
-| 分量 | 公式 | 指标意义 |
-|------|------|---------|
-| 速度跟踪 | r = exp(-α·(v-v*)²) | 鼓励 0.2~1.0 m/s 目标行走速度 |
-| 能耗惩罚 (COT) | r = -β·Σ\|τ·q̇\| / (mg\|v\|) | 成本传输比，惩罚高能耗动作 |
-| CoP 软约束 | r = -γ·\|\|CoP-center\|\|² | 基于 ZMP 判据的稳定性保障 |
+**图3：物理奖励各分量实时监控（200 steps）**
 
-- 所有分量自动注入 info 字典，可通过 TensorBoard 实时监控各项物理指标
+![物理奖励各分量实时监控](figures/fig3_reward_components.png)
+
+由上图可见各物理奖励分量的实时变化情况：
+- **Velocity Tracking**（左上）：速度跟踪奖励在 0.25~0.35 区间波动
+- **COT Energy Penalty**（右上）：能耗惩罚在环境 reset 时出现尖峰
+- **CoP Constraint**（左下）：简化环境中 CoP 为零（待接入真实双足后生效）
+- **Total Reward**（右下）：加权总奖励整体稳定
 
 ### 2. 双足模型物理环境搭建
 
 #### (1) 简化双足 URDF 模型（`envs/simple_biped.urdf`）
-- 参照宇树 G1 人形机器人比例，生成 6-DoF 简化双足模型
-- 结构：躯干(5kg) + 左右腿各 3 关节（hip/knee/ankle），总质量 11kg
+参照宇树 G1 人形机器人比例，生成 6-DoF 简化双足模型（躯干 + 左右腿各 3 关节）。
 
-#### (2) URDF 静态验证工具（`scripts/validate_urdf.py`）
-- 利用 PyBullet 自动完成：关节配置扫描、质量统计、自由落体重力测试、地面碰撞检测
-- 验证报告结果摘要：
+#### (2) URDF 静态验证与校准
 
+**图4：URDF 关节配置与质量分布**
+
+![URDF 关节配置与质量分布](figures/fig4_urdf_report.png)
+
+- **左图**：6 个旋转关节(revolute)的角度限位范围可视化，Hip ±90°，Knee 0~149°，Ankle ±45°
+- **右图**：质量分布饼图，躯干占 45%（5.0 kg），总质量 11.0 kg
+
+PyBullet 重力测试结果：
 ```
-Active DOF: 6 (全部 revolute 类型)
-Total Mass: 11.000 kg
-Gravity Test: 从 1.0m 自由落体 → 最终 z=0.764m, 4 个地面接触点
+Initial: z=1.000m → Final: z=0.764m, Ground contacts: 4 points
 ```
 
-### 3. 工程化规范提升
+### 3. 技术路线总览
+
+**图5：毕设技术路线全景图**
+
+![技术路线全景图](figures/fig5_pipeline.png)
+
+当前已完成 Offline Prior + KL Loss + Physics Reward 的核心算法模块（绿色标注），为后续 MoCap → Retargeting → BC → PPO → Sim2Real 的完整技术管线奠定了算法基础。
+
+### 4. 工程化规范提升
 - 模块化设计：所有新增代码遵循单一职责原则，scripts/ 目录可作为 Python 包直接 import
 - 集成测试：通过 `test_load_model.py` 实现 4 项自动化自检，确保各模块可独立运行
-- 代码上传：全部代码已推送至 GitHub 仓库 Bachelor-s-Graduation-Project
+- 全部代码已推送至 GitHub 仓库 Bachelor-s-Graduation-Project
 
 ---
 
