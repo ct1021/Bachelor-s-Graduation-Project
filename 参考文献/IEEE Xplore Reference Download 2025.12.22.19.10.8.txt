@@ -1,0 +1,60 @@
+1. M. Hutter et al., “ANYmal—A highly mobile and dynamic quadrupedal robot,” in Proc. Int. Conf. Intell. Robots Syst., 2016, pp.  38–44.
+
+2. T. Takenaka et al., “Real time motion generation and control for biped robot—4th report: Integrated balance control,” in Proc. Int. Conf. Intell. Robots Syst., 2009, pp.  1601–1608.
+
+3. J. Englsberger and C. Ott, “Integration of vertical com motion and angular momentum in an extended capture point tracking controller for bipedal walking,” in Proc. Humanoids, 2012, pp.  183–189.
+
+4. C. Zhou, Z. Li, X. Wang, N. Tsagarakis, and D. Caldwell, “Stabilization of bipedal walking based on compliance control,” Auton. Robots, vol.  40, no.  6, pp.  1041–1057, 2016. [Online]. Available: https://doi.org/10.1007/s10514-015-9507-3
+
+5. F. Sygulla, R. Wittmann, P. Seiwald, A. Hildebrandt, D. Wahrmann, and D. Rixen, “Hybrid position/force control for biped robot stabilization with integrated center of mass dynamics,” in Proc. Humanoids, 2017, pp.  742–748.
+
+6. K. Hashimoto et al., “Realization of biped walking on soft ground with stabilization control based on gait analysis,” in Proc. Int. Conf. Intell. Robots Syst., 2012, pp.  2064–2069.
+
+7. G. Schultz and K. Mombaur, “Modeling and optimal control of human-like running,” IEEE/ASME Trans. Mechatronics, vol.  15, no.  5, pp.  783–792, Oct. 2010.
+
+8. J. Nakanishi and S. Vijayakumar, “Exploiting passive dynamics with variable stiffness actuation in robot brachiation,” in Proc. Robot.: Sci. Syst., 2012. [Online]. Available: http://www.roboticsproceedings.org/rss08/p39.html
+
+9. D. J. Braun, et al., “Robots driven by compliant actuators: Optimal control under actuation constraints,” IEEE Trans. Robot., vol.  29, no.  5, pp.  1085–1101, Oct. 2013.
+
+10. R. Schlossman, G. C. Thomas, and L. Sentis, “Exploiting the natural dynamics of series elastic robots by actuator-centered sequential linear programming,” 2018, arXiv: 1802.10190.
+
+11. J. Koenemann et al., “Whole-body model-predictive control applied to the HRP-2 humanoid,” in Proc. Int. Conf. Intell. Robots Syst., 2015, pp.  3346–3351.
+
+12. A. H. Chang, C. M. Hubicki, J. J. Aguilar, D. I. Goldman, A. D. Ames, and P. A. Vela, “Learning to jump in granular media: Unifying optimal control synthesis with Gaussian process-based regression,” in Proc. Int. Conf. Robot. Autom., 2017, pp.  2154–2160.
+
+13. M. Neunert, F. Farshidian, A. W. Winkler, and J. Buchli, “Trajectory optimization through contacts and automatic gait discovery for quadrupeds,” IEEE Robot. Autom. Lett., vol.  2, no.  3, pp.  1502–1509, Jul. 2017.
+
+14. I. Mordatch, E. Todorov, and Z. Popović, “Discovery of complex behaviors through contact-invariant optimization,” ACM Trans. Graph., vol.  31, no.  4, 2012, Art. no. 43.
+
+15. M. Kalakrishnan, J. Buchli, P. Pastor, M. Mistry, and S. Schaal, “Fast, robust quadruped locomotion over challenging terrain,” in Proc. Int. Conf. Robot. Autom., 2010, pp.  2665–2670.
+
+16. C. D. Bellicoso, F. Jenelten, C. Gehring, and M. Hutter, “Dynamic locomotion through online nonlinear motion optimization for quadrupedal robots,” IEEE Robot. Autom. Lett., vol.  3, no.  3, pp.  2261–2268, Jul. 2018.
+
+17. A. Werner, W. Turlej, and C. Ott, “Generation of locomotion trajectories for series elastic and viscoelastic bipedal robots,” in Proc. Int. Conf. Intell. Robots Syst., 2017, pp.  5853–5860.
+
+18. A. Hereid, E. A. Cousineau, C. M. Hubicki, and A. D. Ames, “3-D dynamic walking with underactuated humanoid robots: A direct collocation framework for optimizing hybrid zero dynamics,” in Proc. Int. Conf. Robot. Autom., 2016, pp.  1447–1454.
+
+19. D. Pardo, M. Neunert, A. Winkler, R. Grandia, and J. Buchli, “Hybrid direct collocation and control in the constraint-consistent subspace for dynamic legged robot locomotion,” in Proc. Robot.: Sci. Syst., 2017.
+
+20. A. Werner, B. Henze, F. Loeffl, S. Leyendecker, and C. Ott, “Optimal and robust walking using intrinsic properties of a series-elastic robot,” in Proc. Humanoids, 2017, pp.  143–150.
+
+21. S. Kajita et al., “Biped walking pattern generation by using preview control of zero-moment point,” in Proc. Int. Conf. Robot. Autom., 2003, pp.  1620–1626.
+
+22. N. K. Gupta, “Frequency-shaped cost functionals-extension of linear-quadratic-Gaussian design methods,” J. Guid. Control Dyn., vol.  3, no.  6, pp.  529–535, 1980.
+
+23. F. Farshidian, M. Neunert, A. W. Winkler, G. Rey, and J. Buchli, “An efficient optimal planning and control framework for quadrupedal locomotion,” in Proc. Int. Conf. Robot. Autom., 2017, pp. 93–100.
+
+24. F. Farshidian, E. Jelavic, A. Satapathy, M. Giftthaler, and J. Buchli, “Real-time motion planning of legged robots: A model predictive control approach,” in Proc. Humanoids, 2017, pp.  577–584.
+
+25. J.-H. Hours, M. N. Zeilinger, R. Gondhalekar, and C. N. Jones, “Constrained spectrum control,” IEEE Trans. Autom. Control, vol.  60, no.  7, pp.  1969–1974, Jul. 2015.
+
+26. K. Hashimoto, H. Kondo, H.-O. Lim, and A. Takanishi, Online Walking Pattern Generation Using FFT for Humanoid Robots. Cham, Switzerland : Springer, 2015, pp.  417–438. [Online]. Available: https://doi.org/10.1007/978-3-319-14705-5_14
+
+27. J. Doyle and G. Stein, “Multivariable feedback design: Concepts for a classical/modern synthesis,” IEEE Trans. Autom. Control, vol.  AC-26, no.  1, pp.  4–16, Feb. 1981.
+
+28. B. Anderson and D. Mingori, “Use of frequency dependence in linear quadratic control problems to frequency-shape robustness,” J. Guid. Control Dyn., vol.  8, no.  3, pp.  397–401, 1985.
+
+29. B. Moore, “Principal component analysis in linear systems: Controllability, observability, and model reduction,” IEEE Trans. Autom. Control, vol.  AC-26, no.  1, pp.  17–32, Feb. 1981.
+
+30. Y. Tassa, N. Mansard, and E. Todorov, “Control-limited differential dynamic programming,” in Proc. IEEE Int. Conf. Robot. Autom., 2014, pp.  1168–1175.
+

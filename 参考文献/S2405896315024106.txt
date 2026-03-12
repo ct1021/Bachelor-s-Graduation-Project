@@ -1,0 +1,11 @@
+Xiangru Xu, Paulo Tabuada, Jessy W. Grizzle, Aaron D. Ames,
+Robustness of Control Barrier Functions for Safety Critical Control**This work is partially supported by the National Science Foundation Grants 1239055, 1239037 and 1239085.,
+IFAC-PapersOnLine,
+Volume 48, Issue 27,
+2015,
+Pages 54-61,
+ISSN 2405-8963,
+https://doi.org/10.1016/j.ifacol.2015.11.152.
+(https://www.sciencedirect.com/science/article/pii/S2405896315024106)
+Abstract: Barrier functions (also called certificates) have been an important tool for the verification of hybrid systems, and have also played important roles in optimization and multi-objective control. The extension of a barrier function to a controlled system results in a control barrier function. This can be thought of as being analogous to how Sontag extended Lyapunov functions to control Lypaunov functions in order to enable controller synthesis for stabilization tasks. A control barrier function enables controller synthesis for safety requirements specified by forward invariance of a set using a Lyapunov-like condition. This paper develops several important extensions to the notion of a control barrier function. The first involves robustness under perturbations to the vector field defining the system. Input-to-State stability conditions are given that provide for forward invariance, when disturbances are present, of a “relaxation” of set rendered invariant without disturbances. A control barrier function can be combined with a control Lyapunov function in a quadratic program to achieve a control objective subject to safety guarantees. The second result of the paper gives conditions for the control law obtained by solving the quadratic program to be Lipschitz continuous and therefore to gives rise to well-defined solutions of the resulting closed-loop system.
+Keywords: Barrier function; Invariant set; Quadratic program; Robustness; Continuity

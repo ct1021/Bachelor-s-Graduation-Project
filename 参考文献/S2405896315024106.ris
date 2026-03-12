@@ -1,0 +1,24 @@
+TY  - JOUR
+T1  - Robustness of Control Barrier Functions for Safety Critical Control**This work is partially supported by the National Science Foundation Grants 1239055, 1239037 and 1239085.
+AU  - Xu, Xiangru
+AU  - Tabuada, Paulo
+AU  - Grizzle, Jessy W.
+AU  - Ames, Aaron D.
+JO  - IFAC-PapersOnLine
+VL  - 48
+IS  - 27
+SP  - 54
+EP  - 61
+PY  - 2015
+DA  - 2015/01/01/
+T2  - Analysis and Design of Hybrid Systems ADHS
+SN  - 2405-8963
+DO  - https://doi.org/10.1016/j.ifacol.2015.11.152
+UR  - https://www.sciencedirect.com/science/article/pii/S2405896315024106
+KW  - Barrier function
+KW  - Invariant set
+KW  - Quadratic program
+KW  - Robustness
+KW  - Continuity
+AB  - Barrier functions (also called certificates) have been an important tool for the verification of hybrid systems, and have also played important roles in optimization and multi-objective control. The extension of a barrier function to a controlled system results in a control barrier function. This can be thought of as being analogous to how Sontag extended Lyapunov functions to control Lypaunov functions in order to enable controller synthesis for stabilization tasks. A control barrier function enables controller synthesis for safety requirements specified by forward invariance of a set using a Lyapunov-like condition. This paper develops several important extensions to the notion of a control barrier function. The first involves robustness under perturbations to the vector field defining the system. Input-to-State stability conditions are given that provide for forward invariance, when disturbances are present, of a “relaxation” of set rendered invariant without disturbances. A control barrier function can be combined with a control Lyapunov function in a quadratic program to achieve a control objective subject to safety guarantees. The second result of the paper gives conditions for the control law obtained by solving the quadratic program to be Lipschitz continuous and therefore to gives rise to well-defined solutions of the resulting closed-loop system.
+ER  - 
