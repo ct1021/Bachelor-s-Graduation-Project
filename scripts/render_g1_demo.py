@@ -13,7 +13,10 @@ import os
 import sys
 import numpy as np
 
-os.environ.setdefault("MUJOCO_GL", "egl")
+import sys
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("MUJOCO_GL", "egl")
+
 import mujoco
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -64,6 +64,11 @@
 - 搭建 G1 专用 Gymnasium 环境，对接 `PhysicsRewardWrapper`
 - 在 MuJoCo 中运行 G1 仿真验证
 
+### 2. (新增) 跨引擎 Sim2Sim 泛化鲁棒性测试
+- 利用域随机化 (Domain Randomization) 技术，在物理仿真环境中对 G1 的 `mass` 和 `friction` 施加了不同强度的随机物理干扰。
+- 确认了在 ±20% 的噪声环境下，基于 MoCap 冷启动的 PPO 模型仍然具有较高存活率和恢复能力。
+- 生成了用于中期答辩展示的图表与专项评估报告 (`docs/sim2sim_report.md` / `docs/figures/sim2sim_robustness.png`)。
+
 ### 2. 与博士师兄确认数据问题
 > **需当面确认的关键问题：**
 > - 实验室是否有自采的人体 MoCap 数据？格式？

@@ -55,7 +55,13 @@ python scripts/render_g1_demo.py --duration 5
 python scripts/train_g1_ppo.py --timesteps 10000
 
 # 正式训练 (~1-2h)
-nohup python scripts/train_g1_ppo.py --timesteps 500000 --render > train.log 2>&1 &
+# 推荐单开一个终端窗口直接前台运行（可查看炫酷进度条）：
+python scripts/train_g1_ppo.py --timesteps 500000 --render
+
+# (进阶) 如果在 Linux 服务器后台断网跑，才使用下面这行：
+# nohup python scripts/train_g1_ppo.py --timesteps 500000 --render > train.log 2>&1 &
+
+# 然后在另开一个终端查看训练曲线：
 tensorboard --logdir=logs/g1_ppo/ --host 0.0.0.0 --port 6006
 ```
 
