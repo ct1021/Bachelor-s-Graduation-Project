@@ -5,7 +5,7 @@ import sys
 # 尝试导入 unitree_sdk2py
 try:
     from unitree_sdk2py.core.channel import ChannelFactoryInitialize
-    from unitree_sdk2py.g1.sport.sport_client import SportClient
+    from unitree_sdk2py.g1.loco.g1_loco_client import LocoClient
 except ImportError:
     print("[Error] 请在 biped_rl 环境下安装 sdk: pip install unitree_sdk2py")
     sys.exit(1)
@@ -27,8 +27,8 @@ def main():
          print(f"网络通道初始化失败: {e}")
          return
 
-    # 创建 SportClient 实例
-    client = SportClient()
+    # 创建 LocoClient 实例
+    client = LocoClient()
     client.SetTimeout(5.0) # 5秒超时
     client.Init()
     
