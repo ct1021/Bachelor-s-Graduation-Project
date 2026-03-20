@@ -2,17 +2,16 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# 安装系统依赖 (MuJoCo 需要 libgl)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx libglib2.0-0 && \
-    rm -rf /var/lib/apt/lists/*
-
-# 安装 Python 依赖
+# 仅安装 Dashboard 所需的 Python 依赖 (无需 GL/MuJoCo)
 COPY requirements-dashboard.txt .
 RUN pip install --no-cache-dir -r requirements-dashboard.txt
 
-# 复制项目
-COPY . .
+# 只复制 Dashboard 和必要的静态资源
+COPY g1_dashboard/ ./g1_dashboard/
+COPY models/ ./models/
+COPY logs/ ./logs/
+COPY docs/ ./docs/
+COPY envs/ ./envs/
 
 EXPOSE 8000
 

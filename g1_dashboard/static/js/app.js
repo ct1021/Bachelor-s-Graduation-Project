@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCharts();
     fetchStatus();
     fetchExperiments();
+    fetchSystemInfo();
     connectWebSocket();
     
     // Fallback polling if WebSocket fails
@@ -148,6 +149,22 @@ function initCharts() {
             showarrow: false,
             font: { size: 14, color: '#6b7280' },
         }],
+    }, { responsive: true, displayModeBar: false });
+    
+    // Reward Function Breakdown
+    Plotly.newPlot('reward-breakdown-chart', [{
+        values: [50, 30, 20],
+        labels: ['Imitation Tracking', 'Forward Velocity', 'Survival'],
+        type: 'pie',
+        textinfo: 'label+percent',
+        hole: 0.6,
+        marker: {
+            colors: ['#22d3ee', '#10b981', '#a855f7']
+        }
+    }], {
+        ...CHART_LAYOUT,
+        showlegend: false,
+        margin: { l: 20, r: 20, t: 20, b: 20 }
     }, { responsive: true, displayModeBar: false });
     
     // Fetch historical data
@@ -314,5 +331,43 @@ async function fetchExperiments() {
         }
     } catch (e) {
         console.warn('Experiments fetch failed:', e);
+    }
+}
+
+
+// ═══════════════════════════════════════════
+// System Info
+// ═══════════════════════════════════════════
+
+async function fetchSystemInfo() {
+    try {
+        const res = await fetch(`${API_BASE}/api/system-info`);
+        const data = await res.json();
+        
+        document.getElementById('sys-platform').textContent = data.platform;
+        document.getElementById('sys-python').textContent = data.python;
+        document.getElementById('sys-hostname').textContent = data.hostname;
+        
+        const setLib = (id, libName) => {
+            const el = document.getElementById(id);
+            const val = data.libs[libName];
+            if (val) {
+                el.textContent = val;
+                el.style.color = '#10b981';
+            } else {
+                el.textContent = 'Missing';
+                el.style.color = '#ef4444';
+            }
+        };
+        
+        setLib('sys-sb3', 'stable_baselines3');
+        setLib('sys-mujoco', 'mujoco');
+        setLib('sys-torch', 'torch');
+        setLib('sys-numpy', 'numpy');
+        
+        document.getElementById('sys-models').textContent = data.models_available.length + ' saved';
+        
+    } catch (e) {
+        console.warn('System info fetch failed:', e);
     }
 }

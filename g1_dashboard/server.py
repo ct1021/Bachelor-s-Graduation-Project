@@ -56,6 +56,35 @@ app.mount("/static", StaticFiles(directory=str(DASHBOARD_DIR / "static")), name=
 # REST API
 # ═══════════════════════════════════════════════════
 
+@app.get("/api/system-info")
+async def system_info():
+    """返回系统环境信息 — 用于调试和展示"""
+    import platform
+    
+    info = {
+        "platform": platform.system(),
+        "python": platform.python_version(),
+        "hostname": platform.node(),
+        "project_root": str(PROJECT_ROOT),
+        "models_available": [],
+        "libs": {},
+    }
+    
+    # 检测可用的 ML 库
+    for lib_name in ["stable_baselines3", "mujoco", "torch", "gymnasium", "numpy"]:
+        try:
+            mod = __import__(lib_name)
+            info["libs"][lib_name] = getattr(mod, "__version__", "installed")
+        except ImportError:
+            info["libs"][lib_name] = None
+    
+    # 列出可用模型
+    if MODELS_DIR.exists():
+        info["models_available"] = [f.stem for f in MODELS_DIR.glob("*.zip")]
+    
+    return JSONResponse(info)
+
+
 @app.get("/")
 async def index():
     """主页"""
