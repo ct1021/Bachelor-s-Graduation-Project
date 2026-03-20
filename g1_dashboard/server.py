@@ -173,18 +173,27 @@ async def run_inference(model_name: str = "g1_ppo_500k"):
     """加载指定模型, 在 MuJoCo 中推理 500 步, 返回关节轨迹数据"""
     model_path = MODELS_DIR / f"{model_name}.zip"
     if not model_path.exists():
-        # 尝试不带 .zip
         model_path = MODELS_DIR / model_name
         if not model_path.exists():
             return JSONResponse({"error": f"Model not found: {model_name}"}, status_code=404)
     
     try:
         from stable_baselines3 import PPO
+    except ImportError:
+        return JSONResponse({
+            "error": "stable_baselines3 未安装。请切换到 biped_rl 虚拟环境: conda activate biped_rl && pip install stable-baselines3"
+        }, status_code=503)
+    
+    try:
         from envs.g1_env import G1WalkEnv
-        
+    except ImportError as e:
+        return JSONResponse({
+            "error": f"G1 环境加载失败: {e}. 请确保 mujoco 和 envs 模块可用。"
+        }, status_code=503)
+    
+    try:
         model = PPO.load(str(model_path))
         env = G1WalkEnv(render_mode=None)
-        
         obs, _ = env.reset()
         
         trajectory = {

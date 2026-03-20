@@ -1,0 +1,26 @@
+# G1 RL Dashboard Docker 部署配置
+# 使用方法: docker compose -f docker-compose.dashboard.yml up -d
+
+services:
+  g1-dashboard:
+    build: .
+    container_name: g1-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./models:/app/models:ro
+      - ./logs:/app/logs:ro
+      - ./docs:/app/docs:ro
+    networks:
+      - default
+      - ai-service
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+networks:
+  ai-service:
+    external: true
+    name: ai-service_default

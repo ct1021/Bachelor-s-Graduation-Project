@@ -1,0 +1,11 @@
+# Dashboard 基础依赖 (不需要 GPU, 不需要 MuJoCo)
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+websockets>=11.0
+
+# 可选: 如果在有 GPU 的机器上运行, 取消注释以启用推理功能
+# stable-baselines3>=2.0.0
+# mujoco>=3.0.0
+# torch>=2.0.0
+# gymnasium>=0.29.0
+# numpy>=1.24.0
