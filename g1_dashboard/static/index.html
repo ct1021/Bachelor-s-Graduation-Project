@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G1 双足机器人 RL 控制台</title>
+    <meta name="description" content="基于模仿学习与强化学习融合的双足机器人步态控制可视化系统">
+    <!-- Plotly.js CDN -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <!-- ═════════ HEADER ═════════ -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo-icon">🤖</div>
+            <div>
+                <h1>G1 Biped Robot RL Dashboard</h1>
+                <p class="subtitle">Imitation Learning + Reinforcement Learning · Sim2Real Pipeline</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="status-badge" id="training-badge">
+                <span class="pulse"></span>
+                <span id="training-status-text">Checking...</span>
+            </div>
+            <span class="version">v1.0 · 程童 毕设</span>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <!-- ═════════ ROW 1: KPI CARDS ═════════ -->
+        <section class="kpi-row">
+            <div class="kpi-card">
+                <div class="kpi-label">Total Timesteps</div>
+                <div class="kpi-value" id="kpi-timesteps">—</div>
+                <div class="kpi-sub">目标: 10,000,000</div>
+                <div class="kpi-progress-bar"><div class="kpi-progress-fill" id="progress-fill"></div></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Episode Reward</div>
+                <div class="kpi-value" id="kpi-reward">—</div>
+                <div class="kpi-sub">Mean Reward per Episode</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Training FPS</div>
+                <div class="kpi-value" id="kpi-fps">—</div>
+                <div class="kpi-sub">Steps per Second</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">KL Divergence</div>
+                <div class="kpi-value" id="kpi-kl">—</div>
+                <div class="kpi-sub">Policy Stability</div>
+            </div>
+        </section>
+
+        <!-- ═════════ ROW 2: CHARTS ═════════ -->
+        <section class="chart-row">
+            <div class="chart-card">
+                <h3>📈 Reward Curve (实时)</h3>
+                <div id="reward-chart" class="chart-container"></div>
+            </div>
+            <div class="chart-card">
+                <h3>📉 KL Divergence & Loss</h3>
+                <div id="kl-chart" class="chart-container"></div>
+            </div>
+        </section>
+
+        <!-- ═════════ ROW 3: INFERENCE PANEL ═════════ -->
+        <section class="inference-section">
+            <div class="inference-card">
+                <h3>🎮 One-Click Inference</h3>
+                <p>加载训练好的 PPO 策略, 在 MuJoCo 中推理 500 步, 可视化关节轨迹</p>
+                <div class="inference-controls">
+                    <select id="model-select" class="select-model">
+                        <option value="g1_ppo_500k">g1_ppo_500k (500K steps)</option>
+                        <option value="g1_ppo_10k">g1_ppo_10k (10K steps)</option>
+                    </select>
+                    <button class="btn-inference" id="btn-run-inference" onclick="runInference()">
+                        ▶ Run Inference
+                    </button>
+                </div>
+                <div id="inference-status" class="inference-status"></div>
+            </div>
+            <div class="chart-card">
+                <h3>🦿 Joint Trajectory (推理结果)</h3>
+                <div id="joint-chart" class="chart-container"></div>
+            </div>
+        </section>
+
+        <!-- ═════════ ROW 4: EXPERIMENTS TABLE ═════════ -->
+        <section class="experiments-section">
+            <h3>🧪 Saved Experiments & Checkpoints</h3>
+            <table class="experiments-table" id="experiments-table">
+                <thead>
+                    <tr>
+                        <th>Model Name</th>
+                        <th>Size (MB)</th>
+                        <th>Last Modified</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="experiments-body">
+                    <tr><td colspan="4">Loading...</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ═════════ ROW 5: TECH STACK ═════════ -->
+        <section class="tech-section">
+            <h3>🏗 Technical Architecture</h3>
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <div class="tech-icon">🐍</div>
+                    <div class="tech-name">FastAPI</div>
+                    <div class="tech-desc">异步后端 + WebSocket</div>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">🎯</div>
+                    <div class="tech-name">MuJoCo</div>
+                    <div class="tech-desc">物理仿真引擎</div>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">🧠</div>
+                    <div class="tech-name">PPO + IL</div>
+                    <div class="tech-desc">强化+模仿混合架构</div>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">📊</div>
+                    <div class="tech-name">Plotly.js</div>
+                    <div class="tech-desc">交互式实时图表</div>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">🔌</div>
+                    <div class="tech-name">CycloneDDS</div>
+                    <div class="tech-desc">实机通信协议</div>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">🤖</div>
+                    <div class="tech-name">Unitree G1</div>
+                    <div class="tech-desc">29-DoF 人形机器人</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>© 2026 程童 · 西南科技大学 · 基于模仿学习与强化学习融合的双足机器人步态控制研究</p>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
