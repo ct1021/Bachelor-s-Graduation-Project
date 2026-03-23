@@ -17,7 +17,7 @@ import mujoco
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 class G1WalkEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 50}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 100}  # 100Hz
 
     def __init__(self, render_mode=None):
         super().__init__()
@@ -62,10 +62,21 @@ class G1WalkEnv(gym.Env):
 
     def _load_reference_motion(self, csv_path):
         if not os.path.exists(csv_path):
-            print(f"[Warning] MoCap reference not found: {csv_path}. Using zero targets.")
-            self.ref_base_pos = np.zeros((100, 3))
-            self.ref_joint_pos = np.zeros((100, 29))
-            self.ref_length = 100
+            print(f"[Warning] MoCap reference not found: {csv_path}.")
+            print("[Warning] Falling back to sinusoidal walking reference (avoids zero-target IL collapse).")
+            # 用简单正弦波生成伪参考步态，避免纯零目标导致 IL 奖励项完全失效
+            # 频率约 1Hz（双脚轮换），幅度 0.1 rad（约 5.7°，合理的弯腿幅度）
+            T = 1000  # 参考序列长度
+            t = np.linspace(0, 2 * np.pi * 5, T)  # 5个步态周期
+            self.ref_joint_pos = np.zeros((T, 29))
+            # 左髋俯仰(0)、左膝(3)：相位 0°
+            self.ref_joint_pos[:, 0] = 0.1 * np.sin(t)        # 左髋俯仰
+            self.ref_joint_pos[:, 3] = -0.15 * np.abs(np.sin(t))  # 左膝（始终弯曲）
+            # 右髋俯仰(6)、右膝(9)：相位 180°（交替迈步）
+            self.ref_joint_pos[:, 6] = 0.1 * np.sin(t + np.pi) # 右髋俯仰
+            self.ref_joint_pos[:, 9] = -0.15 * np.abs(np.sin(t + np.pi))  # 右膝
+            self.ref_base_pos = np.zeros((T, 3))
+            self.ref_length = T
             return
             
         data = np.loadtxt(csv_path, delimiter=",")
@@ -114,7 +125,8 @@ class G1WalkEnv(gym.Env):
             mujoco.mj_step(self.model, self.data)
             
         self.sim_step += 1
-        self.ref_step = min(self.sim_step, self.ref_length - 1)
+        # 参考轨迹循环播放（mod 防止越界）
+        self.ref_step = self.sim_step % self.ref_length
         
         obs = self._get_obs()
         reward = self._compute_reward()
@@ -124,7 +136,7 @@ class G1WalkEnv(gym.Env):
         root_z = self.data.qpos[2]
         terminated = bool(root_z < 0.55)
         
-        # 超过 20 秒 (1000步 × 0.02s) 视为成功完成一轮
+        # 每个 Episode 最多 1000步 × 0.01s = 10s（训练用短Episode，评测用evaluate_100m_walk.py）
         truncated = bool(self.sim_step >= 1000)
         
         return obs, reward, terminated, truncated, {}

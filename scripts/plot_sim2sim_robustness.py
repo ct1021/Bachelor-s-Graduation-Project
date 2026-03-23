@@ -74,12 +74,24 @@ def plot_results(results, save_path):
     print(f"\n[Success] 鲁棒性验证图表已保存至: {save_path}")
 
 if __name__ == "__main__":
-    model_file = os.path.join(PROJECT_ROOT, "models", "g1_ppo_500k.zip")
+    # 优先使用 10M 步大模型，其次 500k 基线模型
+    model_candidates = [
+        os.path.join(PROJECT_ROOT, "models", "g1_ppo_10000k.zip"),  # 10M 步大模型
+        os.path.join(PROJECT_ROOT, "models", "g1_ppo_500k.zip"),     # 500k 基线模型
+    ]
+    model_file = next((p for p in model_candidates if os.path.exists(p)), None)
+    if model_file is None:
+        raise FileNotFoundError("❌ 未找到可用模型，请先运行训练脚本。")
+    print(f"✅ 使用模型: {model_file}")
     
     # 噪声档位：无噪声, 10% 变化, 20% 变化, 30% 变化
     noise_tiers = [0.0, 0.1, 0.2, 0.3]
-    output_img = os.path.join(PROJECT_ROOT, "docs", "figures", "sim2sim_robustness.png")
     
-    # 每次测试跑 10 个 episode
+    # 确保输出目录存在
+    output_dir = os.path.join(PROJECT_ROOT, "docs", "figures")
+    os.makedirs(output_dir, exist_ok=True)
+    output_img = os.path.join(output_dir, "sim2sim_robustness.png")
+    
+    # 每档跑 10 个 episode，自动生成论文鲁棒性图
     eval_results = run_dr_experiment(model_file, noise_tiers, episodes_per_level=10)
     plot_results(eval_results, output_img)
