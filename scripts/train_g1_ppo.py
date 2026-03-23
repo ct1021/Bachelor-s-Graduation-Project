@@ -72,21 +72,23 @@ def train(args):
     model = PPO(
         policy="MlpPolicy",
         env=env,
-        learning_rate=3e-4,
+        learning_rate=1e-4,          # 降低学习率，减少梯度更新幅度
         n_steps=2048,
         batch_size=64,
         n_epochs=10,
         gamma=0.99,
         gae_lambda=0.95,
         clip_range=0.2,
-        ent_coef=0.01,
+        ent_coef=0.0,                # 关闭熵奖励！原0.01会主动鼓励熵增长 → std爆炸
         vf_coef=0.5,
         max_grad_norm=0.5,
+        target_kl=0.015,             # 新增：KL超过此值时提前停止更新，防止策略发散
         verbose=1,
         tensorboard_log=log_dir,
         device="auto",
         policy_kwargs=dict(
             net_arch=dict(pi=[256, 256], vf=[256, 256]),
+            log_std_init=-1,         # 新增：初始std≈0.37，保守起步，防止早期爆炸
         ),
     )
     
