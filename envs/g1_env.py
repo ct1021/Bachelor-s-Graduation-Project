@@ -120,11 +120,12 @@ class G1WalkEnv(gym.Env):
         reward = self._compute_reward()
         
         # 终止条件判定：摔倒
+        # G1 站立高度约 0.78m，弯腿约 0.6m，低于 0.55m 视为已摔倒
         root_z = self.data.qpos[2]
-        terminated = bool(root_z < 0.4) 
+        terminated = bool(root_z < 0.55)
         
-        # 超过 10 秒
-        truncated = bool(self.sim_step >= 500)
+        # 超过 20 秒 (1000步 × 0.02s) 视为成功完成一轮
+        truncated = bool(self.sim_step >= 1000)
         
         return obs, reward, terminated, truncated, {}
 
@@ -144,13 +145,17 @@ class G1WalkEnv(gym.Env):
         v_error = np.sum(np.square(v_current - v_target))
         vel_reward = np.exp(-2.0 * v_error)
         
-        # 3. Survival
-        survival_reward = 1.0
+        # 3. Survival + Upright Posture Reward
+        # 鼓励机器人保持站立姿态（root_z 越接近 0.78m 越好）
+        root_z = self.data.qpos[2]
+        target_height = 0.78
+        height_reward = np.exp(-10.0 * (root_z - target_height) ** 2)
+        survival_reward = 1.0 + height_reward  # 最大2.0分
         
         # 4. Energy Penalty 
         energy_penalty = -0.001 * np.sum(np.square(self.data.ctrl))
         
-        total_reward = 0.5 * tracking_reward + 0.3 * vel_reward + 0.2 * survival_reward + energy_penalty
+        total_reward = 0.4 * tracking_reward + 0.2 * vel_reward + 0.4 * survival_reward + energy_penalty
         return total_reward
 
     def render(self):
