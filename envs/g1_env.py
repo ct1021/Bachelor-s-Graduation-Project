@@ -42,10 +42,10 @@ class G1WalkEnv(gym.Env):
         self.action_space = spaces.Box(-1.0, 1.0, shape=(self.model.nu,), dtype=np.float32)
         
         # 状态空间:
-        # [Torso Z, Torso VX, Torso VY] (3)
-        # [Joint Positions] (29)
-        # [Joint Velocities] (29)
-        obs_dim = 3 + self.model.nq - 7 + self.model.nv - 6  # 3 + 29 + 29 = 61
+        # [root_z(1), vx,vy,vz(3), roll,pitch(2), wx,wy,wz(3)] = 9
+        # [Joint Positions(29), Joint Velocities(29)] = 58
+        # Total = 67
+        obs_dim = 9 + (self.model.nq - 7) + (self.model.nv - 6)  # 9 + 29 + 29 = 67
         self.observation_space = spaces.Box(-np.inf, np.inf, shape=(obs_dim,), dtype=np.float32)
 
         self._load_reference_motion(csv_path)
@@ -85,17 +85,24 @@ class G1WalkEnv(gym.Env):
         self.ref_length = data.shape[0]
 
     def _get_obs(self):
-        root_z = self.data.qpos[2]
-        root_vx = self.data.qvel[0]
-        root_vy = self.data.qvel[1]
+        # === 根部状态（9维）===
+        root_z = self.data.qpos[2:3]             # 质心高度 (1)
+        root_vel = self.data.qvel[0:3]            # vx, vy, vz (3)
+        root_angvel = self.data.qvel[3:6]         # wx, wy, wz (3) ← 新增！
         
-        joint_pos = self.data.qpos[7:]
-        joint_vel = self.data.qvel[6:]
+        # 姿态角：四元数 → roll, pitch ← 新增！这是平衡的关键感知
+        qw, qx, qy, qz = self.data.qpos[3:7]
+        roll = np.arctan2(2*(qw*qx + qy*qz), 1 - 2*(qx**2 + qy**2))
+        pitch = np.arcsin(np.clip(2*(qw*qy - qz*qx), -1.0, 1.0))
+        orientation = np.array([roll, pitch])     # (2)
+        
+        # === 关节状态（58维）===
+        joint_pos = self.data.qpos[7:]            # (29)
+        joint_vel = self.data.qvel[6:]            # (29)
         
         obs = np.concatenate([
-            [root_z, root_vx, root_vy],
-            joint_pos,
-            joint_vel
+            root_z, root_vel, orientation, root_angvel,
+            joint_pos, joint_vel
         ]).astype(np.float32)
         return obs
 
@@ -117,7 +124,8 @@ class G1WalkEnv(gym.Env):
         # 动作缩放，由于 G1 力矩较大
         action = np.clip(action, -1.0, 1.0)
         torque_limit = self.model.actuator_ctrlrange[:, 1]
-        scaled_action = action * torque_limit
+        # 只使用 30% 最大力矩，防止暴力输出导致失稳
+        scaled_action = 0.3 * action * torque_limit
         
         self.data.ctrl[:] = scaled_action
         
@@ -149,38 +157,43 @@ class G1WalkEnv(gym.Env):
         # 1. Imitation Learning Reward (Joint Tracking)
         current_joint_pos = self.data.qpos[7:7+29]
         target_joint_pos = self.ref_joint_pos[self.ref_step]
-        
-        # 仅追踪前12个关节（腿部）的误差，忽略手臂
         pos_error = np.sum(np.square(current_joint_pos[:12] - target_joint_pos[:12]))
         tracking_reward = np.exp(-5.0 * pos_error)
         
-        # 2. Reinforcement Learning Reward (Velocity)
-        # 目标速度 0.5m/s (X方向)
-        v_target = np.array([0.5, 0.0])
-        v_current = self.data.qvel[0:2]
-        v_error = np.sum(np.square(v_current - v_target))
-        vel_reward = np.exp(-2.0 * v_error)
+        # 2. Velocity Tracking Reward
+        vx = self.data.qvel[0]
+        vel_reward = np.exp(-2.0 * (vx - 0.5)**2)
         
-        # 3. Survival + Upright Posture Reward
-        # 鼓励机器人保持站立姿态（root_z 越接近 0.78m 越好）
+        # 3. Upright Posture Reward（高度接近 0.78m）
         root_z = self.data.qpos[2]
-        target_height = 0.78
-        height_reward = np.exp(-10.0 * (root_z - target_height) ** 2)
-        survival_reward = 1.0 + height_reward  # 最大2.0分
+        height_reward = np.exp(-10.0 * (root_z - 0.78) ** 2)
+        survival_reward = 1.0 + height_reward  # 最大2.0
         
-        # 4. Alive Bonus（每多活一步都有固定奖励，鼓励长时间存活）
+        # 4. 姿态保持奖励 ← 新增！直接奖励保持直立
+        qw, qx, qy, qz = self.data.qpos[3:7]
+        roll = np.arctan2(2*(qw*qx + qy*qz), 1 - 2*(qx**2 + qy**2))
+        pitch = np.arcsin(np.clip(2*(qw*qy - qz*qx), -1.0, 1.0))
+        # 直立时 roll≈0, pitch≈0 → orientation_reward≈1.0
+        orientation_reward = np.exp(-5.0 * (roll**2 + pitch**2))
+        
+        # 5. 角速度惩罚 ← 新增！惩罚快速旋转（摔倒前兆）
+        angvel = self.data.qvel[3:6]
+        angvel_penalty = -0.1 * np.sum(np.square(angvel))
+        
+        # 6. Alive Bonus
         alive_bonus = 0.5
         
-        # 5. Energy Penalty（降低力矩消耗，改善 COT 能耗指标）
-        energy_penalty = -0.0001 * np.sum(np.square(self.data.ctrl))
+        # 7. Energy Penalty（力矩已缩至30%，系数调回 0.00005）
+        energy_penalty = -0.00005 * np.sum(np.square(self.data.ctrl))
         
-        # 权重分配：存活(50%) >> 跟踪(20%) = 速度(20%) + alive_bonus + energy
-        # 核心思想：活着比什么都重要，跟踪参考只是锦上添花
+        # 权重：存活+姿态(60%) >> 跟踪(10%) + 速度(10%) + 姿态角(20%)
         total_reward = (
-            0.2 * tracking_reward
-            + 0.2 * vel_reward
-            + 0.5 * survival_reward
+            0.1 * tracking_reward
+            + 0.1 * vel_reward
+            + 0.3 * survival_reward
+            + 0.2 * orientation_reward
             + alive_bonus
+            + angvel_penalty
             + energy_penalty
         )
         return total_reward
