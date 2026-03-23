@@ -23,7 +23,7 @@ class G1WalkEnv(gym.Env):
         super().__init__()
         
         self.render_mode = render_mode
-        self.dt = 0.02  # 控制频率 50Hz
+        self.dt = 0.01  # 控制频率 100Hz（任务书要求 ≥100Hz）
         
         # 加载 模型
         model_path = os.path.join(PROJECT_ROOT, "robot_sdk", "unitree", "unitree_mujoco", "unitree_robots", "g1", "scene_29dof.xml")
