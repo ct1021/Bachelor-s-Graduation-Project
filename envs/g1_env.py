@@ -164,8 +164,10 @@ class G1WalkEnv(gym.Env):
         height_reward = np.exp(-10.0 * (root_z - target_height) ** 2)
         survival_reward = 1.0 + height_reward  # 最大2.0分
         
-        # 4. Energy Penalty 
-        energy_penalty = -0.001 * np.sum(np.square(self.data.ctrl))
+        # 4. Energy Penalty
+        # G1 力矩限位约 100~300 Nm，系数必须极小，否则会淹没其他奖励项
+        # 原来 0.001 导致每步惩罚高达 -2000，已修复为 0.00001
+        energy_penalty = -0.00001 * np.sum(np.square(self.data.ctrl))
         
         total_reward = 0.4 * tracking_reward + 0.2 * vel_reward + 0.4 * survival_reward + energy_penalty
         return total_reward
