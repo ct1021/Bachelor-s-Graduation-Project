@@ -136,6 +136,10 @@ class G1WalkEnv(gym.Env):
         root_z = self.data.qpos[2]
         terminated = bool(root_z < 0.55)
         
+        # 摔倒惩罚：让策略学到"摔倒是非常昂贵的"
+        if terminated:
+            reward -= 50.0
+        
         # 每个 Episode 最多 1000步 × 0.01s = 10s（训练用短Episode，评测用evaluate_100m_walk.py）
         truncated = bool(self.sim_step >= 1000)
         
@@ -164,12 +168,21 @@ class G1WalkEnv(gym.Env):
         height_reward = np.exp(-10.0 * (root_z - target_height) ** 2)
         survival_reward = 1.0 + height_reward  # 最大2.0分
         
-        # 4. Energy Penalty
-        # G1 力矩限位约 100~300 Nm，系数必须极小，否则会淹没其他奖励项
-        # 原来 0.001 导致每步惩罚高达 -2000，已修复为 0.00001
-        energy_penalty = -0.00001 * np.sum(np.square(self.data.ctrl))
+        # 4. Alive Bonus（每多活一步都有固定奖励，鼓励长时间存活）
+        alive_bonus = 0.5
         
-        total_reward = 0.4 * tracking_reward + 0.2 * vel_reward + 0.4 * survival_reward + energy_penalty
+        # 5. Energy Penalty（降低力矩消耗，改善 COT 能耗指标）
+        energy_penalty = -0.0001 * np.sum(np.square(self.data.ctrl))
+        
+        # 权重分配：存活(50%) >> 跟踪(20%) = 速度(20%) + alive_bonus + energy
+        # 核心思想：活着比什么都重要，跟踪参考只是锦上添花
+        total_reward = (
+            0.2 * tracking_reward
+            + 0.2 * vel_reward
+            + 0.5 * survival_reward
+            + alive_bonus
+            + energy_penalty
+        )
         return total_reward
 
     def render(self):
