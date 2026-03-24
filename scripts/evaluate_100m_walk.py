@@ -98,6 +98,7 @@ def evaluate_100m_walk(model_path, target_distance=100.0, max_steps=20000):
 
 if __name__ == "__main__":
     candidates = [
+        os.path.join(PROJECT_ROOT, "models", "g1_ppo_30000k.zip"),
         os.path.join(PROJECT_ROOT, "models", "g1_ppo_fixed_3m.zip"),
         os.path.join(PROJECT_ROOT, "models", "g1_ppo_10000k.zip"),
         os.path.join(PROJECT_ROOT, "models", "g1_ppo_500k.zip"),
