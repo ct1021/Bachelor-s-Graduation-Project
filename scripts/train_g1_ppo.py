@@ -1,21 +1,21 @@
 """
-train_g1_ppo.py — PPO + 模仿学习训练脚本
-==========================================
-基于 Stable-Baselines3 的 PPO 训练骨架。
-奖励函数内置 Tracking Reward 项，体现 "模仿学习 + 强化学习" 融合特色。
+train_g1_ppo.py — V6 GPU 加速 PPO 训练脚本
+=============================================
+核心改进 (V6):
+1. SubprocVecEnv 多进程并行仿真（8x 数据采集加速）
+2. 扩大神经网络容量（[512, 256, 128]，独立 Actor/Critic）
+3. PPO 超参数适配并行训练（更大 batch, 更多 n_steps）
+4. GPU 策略网络推理 + 多核 CPU 物理仿真
 
 用法:
-    # 快速冒烟测试 (1 万步)
-    python scripts/train_g1_ppo.py --timesteps 10000
+    # 快速冒烟测试 (100K 步, 单环境)
+    python scripts/train_g1_ppo.py --timesteps 100000 --num-envs 1
 
-    # 正式训练 (50 万步, ~1-2h on RTX 2070)
-    python scripts/train_g1_ppo.py --timesteps 500000
+    # GPU 加速训练 (30M 步, 8 并行环境, ~1.5h on RTX 2070)
+    python scripts/train_g1_ppo.py --timesteps 30000000 --num-envs 8
 
     # 训练后渲染视频
-    python scripts/train_g1_ppo.py --timesteps 500000 --render
-
-技术路线:
-    Sim (MuJoCo G1) → Sim2Sim (PyBullet 验证) → Sim2Real (实机部署)
+    python scripts/train_g1_ppo.py --render-only models/g1_ppo_30000k
 """
 
 import argparse
@@ -32,23 +32,28 @@ if sys.platform.startswith("linux"):
     os.environ.setdefault("MUJOCO_GL", "egl")
 
 
-def make_env():
-    """创建 G1 训练环境"""
-    from envs.g1_env import G1WalkEnv
-    env = G1WalkEnv(render_mode=None)
-    return env
+def make_env(rank=0, seed=0):
+    """创建 G1 训练环境（支持多进程）"""
+    def _init():
+        from envs.g1_env import G1WalkEnv
+        env = G1WalkEnv(render_mode=None)
+        env.reset(seed=seed + rank)
+        return env
+    return _init
 
 
 def train(args):
-    """PPO 训练主流程"""
+    """PPO 训练主流程（V6 GPU 加速版）"""
     from stable_baselines3 import PPO
-    from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
+    from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecMonitor
     from stable_baselines3.common.callbacks import (
-        EvalCallback, CheckpointCallback, BaseCallback
+        EvalCallback, CheckpointCallback,
     )
     
+    num_envs = args.num_envs
+    
     print("=" * 60)
-    print("  G1 PPO + Imitation Learning Training")
+    print("  G1 PPO V6 — GPU Accelerated Training")
     print("=" * 60)
     
     # ---- 目录准备 ----
@@ -57,71 +62,92 @@ def train(args):
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
     
-    # ---- 环境 ----
-    print("\n[1/4] Creating environment...")
-    env = DummyVecEnv([make_env])
+    # ---- 并行环境 ----
+    print(f"\n[1/4] Creating {num_envs} parallel environments...")
+    if num_envs > 1:
+        env = SubprocVecEnv([make_env(rank=i, seed=42) for i in range(num_envs)])
+    else:
+        env = DummyVecEnv([make_env(rank=0, seed=42)])
     env = VecMonitor(env, log_dir)
     
-    eval_env = DummyVecEnv([make_env])
+    eval_env = DummyVecEnv([make_env(rank=99, seed=123)])
     
+    print(f"  Env type:   {'SubprocVecEnv' if num_envs > 1 else 'DummyVecEnv'}")
+    print(f"  Num envs:   {num_envs}")
     print(f"  Obs space:  {env.observation_space.shape}")
     print(f"  Act space:  {env.action_space.shape}")
     
-    # ---- PPO 模型 ----
-    print("\n[2/4] Initializing PPO model...")
+    # ---- PPO 模型（V6 扩容版） ----
+    print("\n[2/4] Initializing PPO model (V6 expanded)...")
+    
+    # 根据并行环境数调整超参数
+    n_steps_per_env = 4096 if num_envs >= 4 else 2048
+    batch_size = 256 if num_envs >= 4 else 64
+    
     model = PPO(
         policy="MlpPolicy",
         env=env,
-        learning_rate=1e-4,          # 降低学习率，减少梯度更新幅度
-        n_steps=2048,
-        batch_size=64,
-        n_epochs=10,
+        learning_rate=3e-4,              # 稍高的学习率，配合更大网络和并行数据
+        n_steps=n_steps_per_env,         # 每个环境采集 4096 步再更新
+        batch_size=batch_size,           # 更大的 mini-batch
+        n_epochs=5,                      # 减少重复使用次数，防止过拟合旧数据
         gamma=0.99,
         gae_lambda=0.95,
         clip_range=0.2,
-        ent_coef=0.0,                # 关闭熵奖励！原0.01会主动鼓励熵增长 → std爆炸
+        ent_coef=0.01,                   # 重新开启熵奖励，鼓励探索（并行环境更安全）
         vf_coef=0.5,
         max_grad_norm=0.5,
-        target_kl=0.015,             # 新增：KL超过此值时提前停止更新，防止策略发散
+        target_kl=0.02,                  # 稍放宽 KL 约束（并行数据更稳定）
         verbose=1,
         tensorboard_log=log_dir,
-        device="auto",
+        device="auto",                   # 自动选择 GPU
         policy_kwargs=dict(
-            net_arch=dict(pi=[256, 256], vf=[256, 256]),
-            log_std_init=-1,         # 新增：初始std≈0.37，保守起步，防止早期爆炸
+            net_arch=dict(
+                pi=[512, 256, 128],      # Actor: 更宽更深的3层网络
+                vf=[512, 256, 128],      # Critic: 独立的3层网络
+            ),
+            log_std_init=-0.5,           # 初始 std ≈ 0.61，适度探索
         ),
     )
     
     total_params = sum(p.numel() for p in model.policy.parameters())
-    print(f"  Policy params: {total_params:,}")
-    print(f"  Device: {model.device}")
+    print(f"  Network:    Actor [512, 256, 128] + Critic [512, 256, 128]")
+    print(f"  Total params: {total_params:,}")
+    print(f"  Device:     {model.device}")
+    print(f"  n_steps:    {n_steps_per_env} × {num_envs} envs = {n_steps_per_env * num_envs:,} steps/update")
+    print(f"  batch_size: {batch_size}")
     
     # ---- Callbacks ----
     callbacks = []
     
-    # 定期保存 checkpoint
+    # 定期保存 checkpoint（按实际总步数计算）
+    checkpoint_freq = max(100000, args.timesteps // 10)
     checkpoint_cb = CheckpointCallback(
-        save_freq=max(10000, args.timesteps // 10),
+        save_freq=max(1, checkpoint_freq // num_envs),
         save_path=os.path.join(model_dir, "checkpoints"),
         name_prefix="g1_ppo",
     )
     callbacks.append(checkpoint_cb)
     
     # 定期评估
+    eval_freq = max(10000, args.timesteps // 20)
     eval_cb = EvalCallback(
         eval_env,
         best_model_save_path=os.path.join(model_dir, "best"),
         log_path=log_dir,
-        eval_freq=max(5000, args.timesteps // 20),
+        eval_freq=max(1, eval_freq // num_envs),
         n_eval_episodes=5,
         deterministic=True,
     )
     callbacks.append(eval_cb)
     
     # ---- 训练 ----
+    effective_fps_est = 600 * num_envs  # 估算
+    est_hours = args.timesteps / effective_fps_est / 3600
     print(f"\n[3/4] Training for {args.timesteps:,} timesteps...")
-    print(f"  TensorBoard: tensorboard --logdir={log_dir}")
-    print(f"  Estimated time: ~{args.timesteps / 250000:.1f} hours on RTX 2070")
+    print(f"  Estimated FPS:  ~{effective_fps_est:,} (×{num_envs} parallel)")
+    print(f"  Estimated time: ~{est_hours:.1f} hours")
+    print(f"  TensorBoard:    tensorboard --logdir={log_dir}")
     print("-" * 60)
     
     t0 = time.time()
@@ -131,6 +157,7 @@ def train(args):
         progress_bar=True,
     )
     elapsed = time.time() - t0
+    actual_fps = args.timesteps / elapsed
     
     # ---- 保存 ----
     model_path = os.path.join(model_dir, f"g1_ppo_{args.timesteps // 1000}k")
@@ -138,9 +165,11 @@ def train(args):
     
     print("\n" + "=" * 60)
     print(f"[4/4] Training complete!")
-    print(f"  Duration: {elapsed / 60:.1f} min")
+    print(f"  Duration:    {elapsed / 60:.1f} min")
+    print(f"  Actual FPS:  {actual_fps:.0f}")
+    print(f"  Speedup:     ~{actual_fps / 600:.1f}x vs single-env baseline")
     print(f"  Model saved: {model_path}.zip")
-    print(f"  TensorBoard logs: {log_dir}")
+    print(f"  TensorBoard: {log_dir}")
     print("=" * 60)
     
     env.close()
@@ -197,9 +226,11 @@ def render_trained_policy(model_path, output_path=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="G1 PPO + IL Training")
+    parser = argparse.ArgumentParser(description="G1 PPO V6 — GPU Accelerated Training")
     parser.add_argument("--timesteps", "-t", type=int, default=500000,
                        help="Total training timesteps")
+    parser.add_argument("--num-envs", "-n", type=int, default=8,
+                       help="Number of parallel environments (default: 8)")
     parser.add_argument("--render", action="store_true",
                        help="Render trained policy after training")
     parser.add_argument("--render-only", type=str, default=None,
@@ -216,7 +247,7 @@ def main():
     print("\nNext steps:")
     print("  1. View TensorBoard: tensorboard --logdir=logs/g1_ppo/")
     print("  2. Render video: python scripts/train_g1_ppo.py --render-only models/g1_ppo_500k")
-    print("  3. Sim2Sim: Verify policy in PyBullet environment")
+    print("  3. Evaluate: python scripts/evaluate_100m_walk.py")
 
 
 if __name__ == "__main__":
