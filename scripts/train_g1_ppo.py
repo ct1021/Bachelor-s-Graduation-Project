@@ -1,15 +1,19 @@
 """
-train_g1_ppo.py — V6 GPU 加速 PPO 训练脚本
-=============================================
-核心改进 (V6):
+train_g1_ppo.py — V7 GPU 加速 PPO 训练脚本 (支持 BC 预训练权重注入)
+===================================================================
+核心改进 (V7, 在 V6 基础上):
 1. SubprocVecEnv 多进程并行仿真（8x 数据采集加速）
 2. 扩大神经网络容量（[512, 256, 128]，独立 Actor/Critic）
 3. PPO 超参数适配并行训练（更大 batch, 更多 n_steps）
 4. GPU 策略网络推理 + 多核 CPU 物理仿真
+5. **[NEW] BC 预训练权重注入**: --bc-pretrain 参数加载行为克隆权重到 Actor
 
 用法:
     # 快速冒烟测试 (100K 步, 单环境)
     python scripts/train_g1_ppo.py --timesteps 100000 --num-envs 1
+
+    # BC→RL 两阶段训练（推荐）
+    python scripts/train_g1_ppo.py --bc-pretrain models/bc_pretrained.pt --timesteps 30000000 --num-envs 8
 
     # GPU 加速训练 (30M 步, 8 并行环境, ~1.5h on RTX 2070)
     python scripts/train_g1_ppo.py --timesteps 30000000 --num-envs 8
@@ -23,6 +27,7 @@ import os
 import sys
 import time
 import numpy as np
+import torch
 
 # 确保项目根目录在 path 中
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -42,8 +47,54 @@ def make_env(rank=0, seed=0):
     return _init
 
 
+def load_bc_pretrain(model, bc_path):
+    """
+    将 BC 预训练权重注入 PPO 的 Actor 网络。
+
+    权重映射 (BC → SB3 PPO MlpPolicy):
+      mlp.0.weight/bias  →  mlp_extractor.policy_net.0.weight/bias  (47→512)
+      mlp.2.weight/bias  →  mlp_extractor.policy_net.2.weight/bias  (512→256)
+      mlp.4.weight/bias  →  mlp_extractor.policy_net.4.weight/bias  (256→128)
+      action_head.weight/bias  →  action_net.weight/bias            (128→12)
+
+    注意: Critic 网络保持随机初始化，仅注入 Actor 权重。
+    """
+    print(f"\n[BC→RL] 加载 BC 预训练权重: {bc_path}")
+    bc_state = torch.load(bc_path, map_location="cpu", weights_only=True)
+
+    # 权重键名映射
+    KEY_MAP = {
+        "mlp.0.weight": "mlp_extractor.policy_net.0.weight",
+        "mlp.0.bias":   "mlp_extractor.policy_net.0.bias",
+        "mlp.2.weight": "mlp_extractor.policy_net.2.weight",
+        "mlp.2.bias":   "mlp_extractor.policy_net.2.bias",
+        "mlp.4.weight": "mlp_extractor.policy_net.4.weight",
+        "mlp.4.bias":   "mlp_extractor.policy_net.4.bias",
+        "action_head.weight": "action_net.weight",
+        "action_head.bias":   "action_net.bias",
+    }
+
+    policy_state = model.policy.state_dict()
+    injected = 0
+    for bc_key, sb3_key in KEY_MAP.items():
+        if bc_key in bc_state and sb3_key in policy_state:
+            if bc_state[bc_key].shape == policy_state[sb3_key].shape:
+                policy_state[sb3_key] = bc_state[bc_key]
+                injected += 1
+                print(f"  ✅ {bc_key} → {sb3_key} {list(bc_state[bc_key].shape)}")
+            else:
+                print(f"  ⚠️ 形状不匹配: {bc_key} {list(bc_state[bc_key].shape)} vs {sb3_key} {list(policy_state[sb3_key].shape)}")
+        else:
+            print(f"  ❌ 缺失: bc={bc_key in bc_state}, sb3={sb3_key in policy_state}")
+
+    model.policy.load_state_dict(policy_state)
+    print(f"  注入完成: {injected}/8 个权重张量")
+    print(f"  Critic 网络保持随机初始化 ✅")
+    return model
+
+
 def train(args):
-    """PPO 训练主流程（V6 GPU 加速版）"""
+    """PPO 训练主流程（V7 GPU 加速版，支持 BC 预训练）"""
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecMonitor
     from stable_baselines3.common.callbacks import (
@@ -109,6 +160,13 @@ def train(args):
             log_std_init=-0.5,           # 初始 std ≈ 0.61，适度探索
         ),
     )
+
+    # ---- BC 预训练权重注入 ----
+    if args.bc_pretrain:
+        if os.path.exists(args.bc_pretrain):
+            model = load_bc_pretrain(model, args.bc_pretrain)
+        else:
+            print(f"\n⚠️ BC 权重文件未找到: {args.bc_pretrain}，跳过预训练注入")
     
     total_params = sum(p.numel() for p in model.policy.parameters())
     print(f"  Network:    Actor [512, 256, 128] + Critic [512, 256, 128]")
@@ -226,7 +284,7 @@ def render_trained_policy(model_path, output_path=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="G1 PPO V6 — GPU Accelerated Training")
+    parser = argparse.ArgumentParser(description="G1 PPO V7 — GPU Accelerated Training (BC→RL)")
     parser.add_argument("--timesteps", "-t", type=int, default=500000,
                        help="Total training timesteps")
     parser.add_argument("--num-envs", "-n", type=int, default=8,
@@ -235,6 +293,8 @@ def main():
                        help="Render trained policy after training")
     parser.add_argument("--render-only", type=str, default=None,
                        help="Skip training, render from existing model path")
+    parser.add_argument("--bc-pretrain", type=str, default=None,
+                       help="BC 预训练权重路径 (e.g. models/bc_pretrained.pt)")
     args = parser.parse_args()
     
     if args.render_only:
