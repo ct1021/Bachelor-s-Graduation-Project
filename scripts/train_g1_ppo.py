@@ -23,6 +23,7 @@ train_g1_ppo.py — V7 GPU 加速 PPO 训练脚本 (支持 BC 预训练权重注
 """
 
 import argparse
+import multiprocessing
 import os
 import sys
 import time
@@ -35,6 +36,12 @@ sys.path.insert(0, PROJECT_ROOT)
 
 if sys.platform.startswith("linux"):
     os.environ.setdefault("MUJOCO_GL", "egl")
+    # 解决 SubprocVecEnv 在 Linux 上的 ConnectionResetError:
+    # 新版 Python (≥3.12) 默认 start_method='spawn', MuJoCo 环境需要 'fork' 或 'forkserver'
+    try:
+        multiprocessing.set_start_method("forkserver", force=True)
+    except RuntimeError:
+        pass  # 已经设置过
 
 
 def make_env(rank=0, seed=0):
@@ -116,7 +123,13 @@ def train(args):
     # ---- 并行环境 ----
     print(f"\n[1/4] Creating {num_envs} parallel environments...")
     if num_envs > 1:
-        env = SubprocVecEnv([make_env(rank=i, seed=42) for i in range(num_envs)])
+        try:
+            env = SubprocVecEnv([make_env(rank=i, seed=42) for i in range(num_envs)])
+            print("  SubprocVecEnv created successfully")
+        except (ConnectionResetError, EOFError, BrokenPipeError) as e:
+            print(f"  ⚠️ SubprocVecEnv failed: {e}")
+            print(f"  Falling back to DummyVecEnv with {num_envs} envs...")
+            env = DummyVecEnv([make_env(rank=i, seed=42) for i in range(num_envs)])
     else:
         env = DummyVecEnv([make_env(rank=0, seed=42)])
     env = VecMonitor(env, log_dir)
